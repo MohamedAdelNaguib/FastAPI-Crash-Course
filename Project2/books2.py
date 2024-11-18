@@ -1,6 +1,7 @@
 from typing import Optional
-from fastapi import Body, FastAPI
+from fastapi import FastAPI, Path, Query, HTTPException
 from pydantic import BaseModel, Field
+from starlette import status
 app = FastAPI()
 
 
@@ -53,49 +54,57 @@ BOOKS = [
     Book(6, 'HP3', 'Author 3', 'Book Description', 1, 2026)
 ]
 
-@app.get("/books")
+@app.get("/books", status_code= status.HTTP_200_OK)
 async def read_all_books():
     return BOOKS
 
-@app.get("/book/{book_id}")
-async def get_book_by_id(book_id: int):
+@app.get("/book/{book_id}" , status_code= status.HTTP_200_OK)
+async def get_book_by_id(book_id: int = Path(gt=0)):
     for book in BOOKS:
         if book.id == book_id:
             return book
+    raise HTTPException(status_code=404, detail="Iterm not found")
 
-@app.get("/books/")
-async def get_book_by_rating(book_rating: int):
+@app.get("/books/", status_code= status.HTTP_200_OK)
+async def get_book_by_rating(book_rating: int = Query(gt=0, lt=6)):
     return [book for book in BOOKS if book.rating == book_rating]
 
 
-@app.get("/books/publish/")
-async def get_book_by_rating(published_data: int):
+@app.get("/books/publish/", status_code= status.HTTP_200_OK)
+async def get_book_by_rating(published_data: int = Query(gt=1999, lt=2031)):
     return [book for book in BOOKS if book.published_date == published_data]
 
 
-@app.post("/create-book")
+@app.post("/create-book", status_code= status.HTTP_201_CREATED)
 async def create_book(book_request: BookRequest):
     new_book = Book(**book_request.model_dump())
     BOOKS.append(find_book_id(new_book))
-
-
-
 
 def find_book_id(book: Book):
     book.id = 1 if len(BOOKS) == 0 else BOOKS[-1].id +1
     return book
 
-@app.put("/books/update_book")
+@app.put("/books/update_book", status_code= status.HTTP_204_NO_CONTENT)
 async def create_book(book: BookRequest):
+    book_changed = False
     for i in range(len(BOOKS)):
         if BOOKS[i].id == book.id:
             new_book = Book(**book.model_dump())
             BOOKS[i] = new_book
-            print(type(BOOKS[i]))
+            book_changed = True
 
-@app.delete("/books/{book_id}")
-async  def delete_book(book_id : int):
+    if not book_changed:
+        raise HTTPException(status_code=404, detail="Iterm not found")
+
+@app.delete("/books/{book_id}", status_code= status.HTTP_204_NO_CONTENT)
+async  def delete_book(book_id : int = Path(gt=0)):
+    book_deleted = False
     for i in range(len(BOOKS)):
         if BOOKS[i].id == book_id:
             BOOKS.pop(i)
+            book_deleted = True
             break
+    if not book_deleted:
+        raise HTTPException(status_code=404, detail="Iterm not found")
+
+
