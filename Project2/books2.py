@@ -1,5 +1,6 @@
+from typing import Optional
 from fastapi import Body, FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 app = FastAPI()
 
 
@@ -9,42 +10,92 @@ class Book:
     author: str
     description: str
     rating: int
+    published_date: int
 
-    def __init__(self, id, title, author, description, rating):
+    def __init__(self, id, title, author, description, rating, published_date):
         self.id = id
         self.title = title
         self.description = description
         self.author = author
         self.rating = rating
+        self.published_date = published_date
+
 
 
 class BookRequest(BaseModel):
-    id: int
-    title: str
-    author: str
-    description: str
-    rating: int
+    id: Optional[int] = Field(description="ID is not needed on create", default=None)
+    title: str = Field(min_length=3)
+    author: str = Field(min_length=1)
+    description: str = Field(min_length=1, max_length=100)
+    rating: int = Field(gt=-1, lt=6)
+    published_date: int = Field(gt=1999, lt=2031)
 
 
-
+    model_config = {
+        "json_schema_extra" : {
+            "example": {
+                "title": "A new book",
+                "author": "codingwithroby",
+                "description": "A new description of a book",
+                "rating": 5,
+                "published_date": 2020
+            }
+        }
+    }
 
 
 BOOKS = [
-    Book(1, 'Computer Science Pro', 'codingwithroby', 'A very nice book!', 5),
-    Book(2, 'Be Fast with FastAPI', 'codingwithroby', 'A great book!', 5),
-    Book(3, 'Master Endpoints', 'codingwithroby', 'A awesome book!', 5),
-    Book(4, 'HP1', 'Author 1', 'Book Description', 2),
-    Book(5, 'HP2', 'Author 2', 'Book Description', 3),
-    Book(6, 'HP3', 'Author 3', 'Book Description', 1)
+    Book(1, 'Computer Science Pro', 'codingwithroby', 'A very nice book!', 5, 2030),
+    Book(2, 'Be Fast with FastAPI', 'codingwithroby', 'A great book!', 5, 2030),
+    Book(3, 'Master Endpoints', 'codingwithroby', 'A awesome book!', 5, 2029),
+    Book(4, 'HP1', 'Author 1', 'Book Description', 2, 2028),
+    Book(5, 'HP2', 'Author 2', 'Book Description', 3, 2027),
+    Book(6, 'HP3', 'Author 3', 'Book Description', 1, 2026)
 ]
 
 @app.get("/books")
 async def read_all_books():
     return BOOKS
 
+@app.get("/book/{book_id}")
+async def get_book_by_id(book_id: int):
+    for book in BOOKS:
+        if book.id == book_id:
+            return book
+
+@app.get("/books/")
+async def get_book_by_rating(book_rating: int):
+    return [book for book in BOOKS if book.rating == book_rating]
+
+
+@app.get("/books/publish/")
+async def get_book_by_rating(published_data: int):
+    return [book for book in BOOKS if book.published_date == published_data]
+
 
 @app.post("/create-book")
 async def create_book(book_request: BookRequest):
     new_book = Book(**book_request.model_dump())
-    BOOKS.append(new_book)
+    BOOKS.append(find_book_id(new_book))
 
+
+
+
+def find_book_id(book: Book):
+    book.id = 1 if len(BOOKS) == 0 else BOOKS[-1].id +1
+    return book
+
+@app.put("/books/update_book")
+async def create_book(book: BookRequest):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].id == book.id:
+            new_book = Book(**book.model_dump())
+            BOOKS[i] = new_book
+            print(type(BOOKS[i]))
+
+@app.delete("/books/{book_id}")
+async  def delete_book(book_id : int):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].id == book_id:
+            BOOKS.pop(i)
+            break
